@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<link rel="stylesheet" href="css/bootstrap.css" type="text/css"/>
+
+	<link rel="stylesheet" href="css/stylesheet.css" type="text/css"/>
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular-route.js"></script>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Job Board Angular Edition.</title>
+</head>
+<body ng-app="myApp">
+
+	<div ng-controller="demoController">
+
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-xl-3 col-lg-3 col-md-3 col-sm-12 col-xs-12">
+					<div class="job_page_logo"><h3>Job Board</h3></div>
+				</div>
+				<div class="col-xl-9 col-lg-9 col-md-9 col-sm-12 col-xs-12">
+					<div class="job_page_header_text">
+						<h4>Recently posted jobs:</h4>
+					</div>
+				</div>
+			</div>			
+
+			<div class="row">
+				<div class="col-xl-3 col-lg-3 col-md-3 col-sm-12 col-sm-12">
+					<div class="job_input_panel">
+						<input type="input" class="job_input" ng-model="searchText.name" placeholder="Filter job by name"/>
+						<input type="input" class="job_input" ng-model="searchText.location" placeholder="Filter job by location"/>
+
+						<button class="job_button" ng-click="sortDate()">Sort {{sortOrder}}</button>
+					</div>
+				</div>
+				<div class="col-xl-9 col-lg-9 col-md-9 col-sm-12 col-sm-12">
+					<div class="jobs_list_container">
+						<ul ng-repeat="item in jobs| mySearch:searchText.name:searchText.location">
+							<div class="job">
+								<div class="job_info">
+									<p><strong>{{item.name}} based in {{item.location}}</strong></p> 
+									<p>{{item.description.substring(0,160) + "..."}}</p>
+								</div>
+								<div ng-init="showModal=false">
+									<div class="job_info_bottom">
+
+										<button class="job_button" ng-click="showModal = !showModal">
+											More details
+										</button>
+									</div>
+									<div class="modal fade in" aria-hidden="false" style="display: block;" ng-show="showModal">  
+										<div class="modal-dialog">    
+											<div class="modal-content" style="padding: 20px;"> 
+												<p><strong>{{item.name}} based in {{item.location}}</strong></p> 
+												<p>Closes on {{item.date}}</p> 
+												<p>{{item.description}}</p>   
+												<div class="modal-footer">        
+													<button type="button" class="btn btn-primary" ng-click="showModal=false">Ok</button>     
+												</div>    
+											</div>  
+										</div>
+									</div>
+								</div>
+							</div>
+						</ul>
+					</div>
+					<div class="jobs_page_bottom">
+						<button class="job_button" ng-click="loadJobs()">{{jobButton}}</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+	</div>
+</div>
+
+<script>
+	var app = angular.module('myApp',[]);
+	app.controller('demoController', function($scope,$http) {
+
+
+
+		// Main object array
+		$scope.jobs = [];
+		
+
+		// Request jobs data from server
+		$http.get("https://chamberscreative.co.uk/job_board_angular/backend/endpoint.php?request=3")
+		.then(function(response) {$scope.jobs = response.data;
+			console.log(response);
+		});
+
+
+
+
+		// Request more jobs data from server
+		$scope.reachEndOfJobs = 0;
+		$scope.searchLimit = 0;
+		$scope.jobButton = "Load more jobs";
+		$scope.loadJobs = function() 
+		{
+			$scope.searchLimit = $scope.searchLimit + 3;
+			$http.get("https://chamberscreative.co.uk/job_board_angular/backend/endpoint.php?request=" + $scope.searchLimit)
+			.then(function(response) {
+				var newCount = Object.keys(response.data).length;
+				var currentCount = Object.keys($scope.jobs).length;
+				if (newCount > currentCount)
+				{
+					$scope.jobs = response.data;
+				}
+				else if(newCount === currentCount)
+				{
+					$scope.reachEndOfJobs = $scope.reachEndOfJobs + 1;
+					if($scope.reachEndOfJobs === 2)
+					{
+						$scope.reachEndOfJobs = 0;
+						$scope.jobButton = "Sorry, no more jobs!";
+					}
+				}
+
+				
+			});
+
+
+
+
+		}
+
+		//Local test data
+		/*	$scope.jobs = [
+		{id:1, name: "John", description: "example job", location: "Oxford", date: "14/03/2018"},
+		{id:2, name: "Tony", description: "example job2", location: "Oxford", date: "07/03/2018"},
+		{id:3, name: "Sarah", description: "example job3", location: "Oxford", date: "06/06/2017"}
+		];*/
+
+
+
+
+		// Sort date
+		$scope.sortOrder = "ascending";
+		$scope.order = true;
+		$scope.sortDate = function()
+		{
+
+
+			function compare(a, b) {
+				const dateA = a.date;
+				const dateB = b.date;
+
+				let comparison = 0;
+				if (dateA > dateB) {
+					($scope.order === true) ? comparison = 1 : comparison = -1;
+				} 
+				else if (dateA < dateB) {
+					($scope.order === true) ? comparison = -1 : comparison = 1;
+				}
+				return comparison;
+			}
+
+			$scope.jobs.sort(compare);
+			$scope.order = !$scope.order;
+
+			($scope.order === true) ? $scope.sortOrder = "ascending" : $scope.sortOrder = "descending";
+
+		}
+
+	});
+
+
+
+	// Custom filter
+	app.filter('mySearch', function() {
+
+		return function(input, userinput, location)
+		{	
+
+
+			
+			if(userinput && location)
+			{
+				var output = [];
+
+				angular.forEach(input, function(item) {
+					if((item.name.toLowerCase().indexOf(userinput.toLowerCase()) !== -1) && (item.location.toLowerCase().indexOf(location.toLowerCase()) !== -1))
+					{
+						output.push(item);
+					}
+
+				});
+			}
+
+			else if (userinput) 
+			{
+				var output = [];
+				angular.forEach(input, function(item) {
+					if((item.name.toLowerCase().indexOf(userinput.toLowerCase()) !== -1))
+					{
+						output.push(item);
+					}
+
+				});
+
+			}
+
+
+			else if (location) 
+			{
+				var output = [];
+				angular.forEach(input, function(item) {
+					if((item.location.toLowerCase().indexOf(location.toLowerCase()) !== -1))
+					{
+						output.push(item);
+					}
+
+				});
+
+			}
+			else
+			{
+				output = input;
+			}
+
+			return output;
+		}
+	});
+
+	
+</script>
+</body>
+</html>
